@@ -4,9 +4,6 @@ const fs = require('fs');
 
 // Correctif écran noir sur PC anciens / Windows 7 (pilotes GPU incompatibles)
 app.disableHardwareAcceleration();
-app.commandLine.appendSwitch('disable-gpu');
-app.commandLine.appendSwitch('disable-gpu-compositing');
-app.commandLine.appendSwitch('disable-software-rasterizer');
 
 // ─── Emplacement des données (persistant, propre à ton PC) ───
 const userDataPath = app.getPath('userData');
@@ -80,6 +77,10 @@ function createWindow() {
   mainWindow.setMenuBarVisibility(false);
   mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
   mainWindow.once('ready-to-show', () => mainWindow.show());
+  mainWindow.webContents.openDevTools({ mode: 'detach' });
+  mainWindow.webContents.on('did-fail-load', (e, code, desc) => {
+    console.log('Échec de chargement :', code, desc);
+  });
 }
 
 app.whenReady().then(createWindow);
