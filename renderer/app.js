@@ -105,6 +105,7 @@ async function loadAll(){
     streams: (a.liens && a.liens.streams) || 0,
     abonnes: (a.liens && a.liens.abonnes) || 0,
     ecoutes: (a.liens && a.liens.ecoutes) || 0,
+    vuesYoutube: (a.liens && a.liens.vuesYoutube) || 0,
     ordre: a.ordre || 0,
     styleBars: (a.liens && Array.isArray(a.liens.style_bars)) ? a.liens.style_bars : [],
     _liens: a.liens || {}
@@ -303,6 +304,7 @@ function openArtisteModal(id){
   document.getElementById('a-streams').value = a ? a.streams||'' : '';
   document.getElementById('a-abonnes').value = a ? a.abonnes||'' : '';
   document.getElementById('a-ecoutes').value = a ? a.ecoutes||'' : '';
+  document.getElementById('a-vues-youtube').value = a ? a.vuesYoutube||'' : '';
   const bars = a ? (a.styleBars||[]) : [];
   document.getElementById('a-bar1-label').value = bars[0] ? bars[0].label||'' : '';
   document.getElementById('a-bar1-value').value = bars[0] ? bars[0].value||'' : '';
@@ -353,6 +355,7 @@ document.getElementById('a-save').addEventListener('click', async ()=>{
     streams: parseInt(document.getElementById('a-streams').value)||0,
     abonnes: parseInt(document.getElementById('a-abonnes').value)||0,
     ecoutes: parseInt(document.getElementById('a-ecoutes').value)||0,
+    vuesYoutube: parseInt(document.getElementById('a-vues-youtube').value)||0,
     style_bars
   };
 
