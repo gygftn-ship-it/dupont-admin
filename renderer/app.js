@@ -6,8 +6,9 @@ const SUPABASE_URL = 'https://csijufljeasiwfppmnog.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_yXiQd9iGZ7LxKLvU2ibnUQ_pBFh-xKi';
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-let state = { artistes: [], demandes: [] };
+let state = { artistes: [], demandes: [], discographie: [] };
 let currentFilter = 'tous';
+let currentArtisteForDisco = null;
 
 /* ═══════════════════════════════════════
    AUTHENTIFICATION
@@ -74,16 +75,20 @@ document.getElementById('btn-refresh').addEventListener('click', async ()=>{
 });
 
 async function loadAll(){
-  const [{ data: artistes, error: e1 }, { data: contacts, error: e2 }, { data: reservations, error: e3 }] =
+  const [{ data: artistes, error: e1 }, { data: contacts, error: e2 }, { data: reservations, error: e3 }, { data: discographie, error: e4 }] =
     await Promise.all([
       sb.from('artistes').select('*').order('ordre'),
       sb.from('messages_contact').select('*').order('created_at', { ascending: false }),
-      sb.from('demandes_reservation').select('*').order('created_at', { ascending: false })
+      sb.from('demandes_reservation').select('*').order('created_at', { ascending: false }),
+      sb.from('discographie').select('*').order('ordre')
     ]);
 
   if(e1) console.warn('Erreur chargement artistes:', e1.message);
   if(e2) console.warn('Erreur chargement messages:', e2.message);
   if(e3) console.warn('Erreur chargement réservations:', e3.message);
+  if(e4) console.warn('Erreur chargement discographie:', e4.message);
+
+  state.discographie = discographie || [];
 
   state.artistes = (artistes || []).map(a => ({
     id: a.id,
@@ -97,6 +102,9 @@ async function loadAll(){
     deezerUrl: (a.liens && a.liens.deezer) || '',
     paysEcoute: (a.liens && a.liens.paysEcoute) || 0,
     statut: (a.liens && a.liens.statut) || 'actif',
+    streams: (a.liens && a.liens.streams) || 0,
+    abonnes: (a.liens && a.liens.abonnes) || 0,
+    ecoutes: (a.liens && a.liens.ecoutes) || 0,
     ordre: a.ordre || 0,
     styleBars: (a.liens && Array.isArray(a.liens.style_bars)) ? a.liens.style_bars : [],
     _liens: a.liens || {}
@@ -292,6 +300,9 @@ function openArtisteModal(id){
   document.getElementById('a-pays').value = a ? a.paysEcoute||0 : 0;
   document.getElementById('a-ordre').value = a ? a.ordre||(state.artistes.length+1) : (state.artistes.length+1);
   document.getElementById('a-statut').value = a ? a.statut : 'actif';
+  document.getElementById('a-streams').value = a ? a.streams||'' : '';
+  document.getElementById('a-abonnes').value = a ? a.abonnes||'' : '';
+  document.getElementById('a-ecoutes').value = a ? a.ecoutes||'' : '';
   const bars = a ? (a.styleBars||[]) : [];
   document.getElementById('a-bar1-label').value = bars[0] ? bars[0].label||'' : '';
   document.getElementById('a-bar1-value').value = bars[0] ? bars[0].value||'' : '';
@@ -300,6 +311,9 @@ function openArtisteModal(id){
   document.getElementById('a-bar3-label').value = bars[2] ? bars[2].label||'' : '';
   document.getElementById('a-bar3-value').value = bars[2] ? bars[2].value||'' : '';
   document.getElementById('a-delete').style.display = a ? 'inline-block' : 'none';
+  const discoBtn = document.getElementById('a-discography-btn');
+  discoBtn.style.display = a ? 'inline-block' : 'none';
+  discoBtn.onclick = () => { if(a) openDiscographyModal(a.id); };
   modal.classList.add('active');
 }
 function closeArtisteModal(){ document.getElementById('modal-artiste').classList.remove('active'); }
@@ -336,6 +350,9 @@ document.getElementById('a-save').addEventListener('click', async ()=>{
     deezer: document.getElementById('a-deezer').value.trim(),
     paysEcoute: parseInt(document.getElementById('a-pays').value)||0,
     statut: document.getElementById('a-statut').value,
+    streams: parseInt(document.getElementById('a-streams').value)||0,
+    abonnes: parseInt(document.getElementById('a-abonnes').value)||0,
+    ecoutes: parseInt(document.getElementById('a-ecoutes').value)||0,
     style_bars
   };
 
@@ -372,6 +389,107 @@ document.getElementById('a-delete').addEventListener('click', async ()=>{
 function escapeHtml(str){
   return String(str||'').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 }
+
+/* ═══════════════════════ DISCOGRAPHIE ═══════════════════════ */
+function openDiscographyModal(artisteId){
+  currentArtisteForDisco = artisteId;
+  const artiste = state.artistes.find(a => a.id === artisteId);
+  document.getElementById('modal-discography-title').textContent =
+    'Discographie — ' + (artiste ? artiste.nom : '');
+  renderDiscographyList();
+  document.getElementById('modal-discography').classList.add('active');
+}
+function closeDiscographyModal(){
+  document.getElementById('modal-discography').classList.remove('active');
+  currentArtisteForDisco = null;
+}
+document.getElementById('disco-back').addEventListener('click', closeDiscographyModal);
+
+function renderDiscographyList(){
+  const list = document.getElementById('discography-list');
+  const tracks = state.discographie
+    .filter(t => t.artiste_id === currentArtisteForDisco)
+    .sort((a,b)=>(a.ordre||0)-(b.ordre||0));
+
+  let html = '<button id="disco-add-btn" class="btn btn-primary" style="width:100%;margin-bottom:12px;">+ Ajouter un titre</button>';
+  if(tracks.length === 0){
+    html += '<div class="empty-state">Aucun titre pour le moment.</div>';
+  } else {
+    html += tracks.map(t => `
+      <div class="card" onclick="openTrackModal('${t.id}')">
+        <div class="avatar" style="${t.cover_url?`background-image:url('${t.cover_url}')`:''}">${t.cover_url?'':'🎵'}</div>
+        <div class="card-main">
+          <div class="card-title">${escapeHtml(t.titre||'')}</div>
+          <div class="card-sub">${({single:'Single',ep:'EP',album:'Album'}[t.type]||t.type||'')}${t.date_sortie ? ' — ' + t.date_sortie : ''}</div>
+        </div>
+      </div>
+    `).join('');
+  }
+  list.innerHTML = html;
+  document.getElementById('disco-add-btn').addEventListener('click', () => openTrackModal(null));
+}
+
+document.getElementById('t-cancel').addEventListener('click', closeTrackModal);
+
+function openTrackModal(id){
+  const t = id ? state.discographie.find(x=>x.id===id) : null;
+  document.getElementById('modal-track-title').textContent = t ? 'Modifier le titre' : 'Nouveau titre';
+  document.getElementById('t-id').value = t ? t.id : '';
+  document.getElementById('t-titre').value = t ? t.titre||'' : '';
+  document.getElementById('t-type').value = t ? t.type||'single' : 'single';
+  document.getElementById('t-date').value = t ? t.date_sortie||'' : '';
+  document.getElementById('t-cover').value = t ? t.cover_url||'' : '';
+  document.getElementById('t-spotify').value = t ? t.spotify_url||'' : '';
+  document.getElementById('t-youtube').value = t ? t.youtube_url||'' : '';
+  document.getElementById('t-apple').value = t ? t.apple_music_url||'' : '';
+  document.getElementById('t-deezer').value = t ? t.deezer_url||'' : '';
+  document.getElementById('t-delete').style.display = t ? 'inline-block' : 'none';
+  document.getElementById('modal-track').classList.add('active');
+}
+function closeTrackModal(){ document.getElementById('modal-track').classList.remove('active'); }
+
+document.getElementById('t-save').addEventListener('click', async ()=>{
+  const id = document.getElementById('t-id').value;
+  const titre = document.getElementById('t-titre').value.trim();
+  if(!titre){ toast('⚠️ Le titre est obligatoire'); return; }
+
+  const existingCount = state.discographie.filter(t => t.artiste_id === currentArtisteForDisco).length;
+  const payload = {
+    artiste_id: currentArtisteForDisco,
+    titre,
+    type: document.getElementById('t-type').value,
+    date_sortie: document.getElementById('t-date').value || null,
+    cover_url: document.getElementById('t-cover').value.trim(),
+    spotify_url: document.getElementById('t-spotify').value.trim(),
+    youtube_url: document.getElementById('t-youtube').value.trim(),
+    apple_music_url: document.getElementById('t-apple').value.trim(),
+    deezer_url: document.getElementById('t-deezer').value.trim()
+  };
+  if(!id) payload.ordre = existingCount;
+
+  try{
+    if(id) await sb.from('discographie').update(payload).eq('id', id);
+    else   await sb.from('discographie').insert(payload);
+    const { data } = await sb.from('discographie').select('*').order('ordre');
+    state.discographie = data || [];
+    renderDiscographyList();
+    closeTrackModal();
+    toast('✅ Titre enregistré');
+  }catch(e){
+    toast('⚠️ Erreur : ' + e.message);
+  }
+});
+
+document.getElementById('t-delete').addEventListener('click', async ()=>{
+  const id = document.getElementById('t-id').value;
+  if(!confirm('Supprimer ce titre ?')) return;
+  await sb.from('discographie').delete().eq('id', id);
+  const { data } = await sb.from('discographie').select('*').order('ordre');
+  state.discographie = data || [];
+  renderDiscographyList();
+  closeTrackModal();
+  toast('🗑 Titre supprimé');
+});
 
 /* ═══════════════════════════════════════
    DÉMARRAGE
