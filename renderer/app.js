@@ -98,6 +98,7 @@ async function loadAll(){
     paysEcoute: (a.liens && a.liens.paysEcoute) || 0,
     statut: (a.liens && a.liens.statut) || 'actif',
     ordre: a.ordre || 0,
+    styleBars: (a.liens && Array.isArray(a.liens.style_bars)) ? a.liens.style_bars : [],
     _liens: a.liens || {}
   }));
 
@@ -291,6 +292,13 @@ function openArtisteModal(id){
   document.getElementById('a-pays').value = a ? a.paysEcoute||0 : 0;
   document.getElementById('a-ordre').value = a ? a.ordre||(state.artistes.length+1) : (state.artistes.length+1);
   document.getElementById('a-statut').value = a ? a.statut : 'actif';
+  const bars = a ? (a.styleBars||[]) : [];
+  document.getElementById('a-bar1-label').value = bars[0] ? bars[0].label||'' : '';
+  document.getElementById('a-bar1-value').value = bars[0] ? bars[0].value||'' : '';
+  document.getElementById('a-bar2-label').value = bars[1] ? bars[1].label||'' : '';
+  document.getElementById('a-bar2-value').value = bars[1] ? bars[1].value||'' : '';
+  document.getElementById('a-bar3-label').value = bars[2] ? bars[2].label||'' : '';
+  document.getElementById('a-bar3-value').value = bars[2] ? bars[2].value||'' : '';
   document.getElementById('a-delete').style.display = a ? 'inline-block' : 'none';
   modal.classList.add('active');
 }
@@ -304,6 +312,21 @@ document.getElementById('a-save').addEventListener('click', async ()=>{
   const existing = id ? state.artistes.find(x=>x.id===id) : null;
   const existingLiens = existing ? (existing._liens || {}) : {};
 
+  const existingBars = (existingLiens.style_bars || []);
+  const defaultColors = ['#1a8cff', '#00e5ff', '#9d6cff'];
+  const barInputs = [
+    { label: document.getElementById('a-bar1-label').value.trim(), value: document.getElementById('a-bar1-value').value },
+    { label: document.getElementById('a-bar2-label').value.trim(), value: document.getElementById('a-bar2-value').value },
+    { label: document.getElementById('a-bar3-label').value.trim(), value: document.getElementById('a-bar3-value').value }
+  ];
+  const style_bars = barInputs
+    .map((b, i) => ({
+      label: b.label,
+      value: b.value === '' ? null : Math.max(0, Math.min(100, parseInt(b.value) || 0)),
+      color: (existingBars[i] && existingBars[i].color) || defaultColors[i]
+    }))
+    .filter(b => b.label && b.value !== null);
+
   const liens = {
     ...existingLiens,
     genre: document.getElementById('a-style').value.trim(),
@@ -312,7 +335,8 @@ document.getElementById('a-save').addEventListener('click', async ()=>{
     appleMusic: document.getElementById('a-apple').value.trim(),
     deezer: document.getElementById('a-deezer').value.trim(),
     paysEcoute: parseInt(document.getElementById('a-pays').value)||0,
-    statut: document.getElementById('a-statut').value
+    statut: document.getElementById('a-statut').value,
+    style_bars
   };
 
   const payload = {
