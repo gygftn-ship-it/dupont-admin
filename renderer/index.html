@@ -172,6 +172,19 @@
       <option value="a_venir">À venir</option>
       <option value="archive">Archivé</option>
     </select>
+    <label style="margin-top:10px;display:block;font-weight:700;">Statistiques (affichées sur le site)</label>
+    <div class="row">
+      <div>
+        <label>Streams (Spotify...)</label>
+        <input type="number" id="a-streams" placeholder="120000">
+      </div>
+      <div>
+        <label>Abonnés</label>
+        <input type="number" id="a-abonnes" placeholder="5400">
+      </div>
+    </div>
+    <label>Écoutes / mois</label>
+    <input type="number" id="a-ecoutes" placeholder="32000">
     <label style="margin-top:10px;display:block;font-weight:700;">Barres de style (affichées sur le site)</label>
     <div class="row">
       <div>
@@ -204,10 +217,75 @@
       </div>
     </div>
     <div class="modal-actions">
+      <button id="a-discography-btn" class="btn btn-ghost" style="display:none;">🎵 Discographie</button>
       <button id="a-delete" class="btn btn-danger" style="display:none;">Supprimer</button>
       <div class="spacer"></div>
       <button id="a-cancel" class="btn btn-ghost">Annuler</button>
       <button id="a-save" class="btn btn-primary">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════ MODALE DISCOGRAPHIE ══════ -->
+<div id="modal-discography" class="modal-overlay">
+  <div class="modal">
+    <h3 id="modal-discography-title">Discographie</h3>
+    <div id="discography-list" style="max-height:280px;overflow-y:auto;margin-bottom:14px;"></div>
+    <div class="modal-actions">
+      <div class="spacer"></div>
+      <button id="disco-back" class="btn btn-ghost">← Retour à l'artiste</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════ MODALE TITRE (ajout/édition discographie) ══════ -->
+<div id="modal-track" class="modal-overlay">
+  <div class="modal">
+    <h3 id="modal-track-title">Nouveau titre</h3>
+    <input type="hidden" id="t-id">
+    <label>Titre</label>
+    <input type="text" id="t-titre" placeholder="Nom du morceau">
+    <div class="row">
+      <div>
+        <label>Type</label>
+        <select id="t-type">
+          <option value="single">Single</option>
+          <option value="ep">EP</option>
+          <option value="album">Album</option>
+        </select>
+      </div>
+      <div>
+        <label>Date de sortie</label>
+        <input type="date" id="t-date">
+      </div>
+    </div>
+    <label>URL Pochette</label>
+    <input type="text" id="t-cover" placeholder="https://...">
+    <div class="row">
+      <div>
+        <label>Spotify</label>
+        <input type="text" id="t-spotify" placeholder="https://open.spotify.com/...">
+      </div>
+      <div>
+        <label>YouTube</label>
+        <input type="text" id="t-youtube" placeholder="https://youtube.com/...">
+      </div>
+    </div>
+    <div class="row">
+      <div>
+        <label>Apple Music</label>
+        <input type="text" id="t-apple" placeholder="https://music.apple.com/...">
+      </div>
+      <div>
+        <label>Deezer</label>
+        <input type="text" id="t-deezer" placeholder="https://deezer.com/...">
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button id="t-delete" class="btn btn-danger" style="display:none;">Supprimer</button>
+      <div class="spacer"></div>
+      <button id="t-cancel" class="btn btn-ghost">Annuler</button>
+      <button id="t-save" class="btn btn-primary">Enregistrer</button>
     </div>
   </div>
 </div>
