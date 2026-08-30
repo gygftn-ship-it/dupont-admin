@@ -8,7 +8,6 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let state = { artistes: [], demandes: [], discographie: [] };
 let currentFilter = 'tous';
-let currentArtisteForDisco = null;
 
 /* ═══════════════════════════════════════
    AUTHENTIFICATION
@@ -65,12 +64,16 @@ async function init(){
   await loadAll();
   renderDemandes();
   renderArtistes();
+  renderStatsTab();
+  renderDiscographieTab();
 }
 
 document.getElementById('btn-refresh').addEventListener('click', async ()=>{
   await loadAll();
   renderDemandes();
   renderArtistes();
+  renderStatsTab();
+  renderDiscographieTab();
   toast('🔄 Données actualisées');
 });
 
@@ -301,10 +304,6 @@ function openArtisteModal(id){
   document.getElementById('a-pays').value = a ? a.paysEcoute||0 : 0;
   document.getElementById('a-ordre').value = a ? a.ordre||(state.artistes.length+1) : (state.artistes.length+1);
   document.getElementById('a-statut').value = a ? a.statut : 'actif';
-  document.getElementById('a-streams').value = a ? a.streams||'' : '';
-  document.getElementById('a-abonnes').value = a ? a.abonnes||'' : '';
-  document.getElementById('a-ecoutes').value = a ? a.ecoutes||'' : '';
-  document.getElementById('a-vues-youtube').value = a ? a.vuesYoutube||'' : '';
   const bars = a ? (a.styleBars||[]) : [];
   document.getElementById('a-bar1-label').value = bars[0] ? bars[0].label||'' : '';
   document.getElementById('a-bar1-value').value = bars[0] ? bars[0].value||'' : '';
@@ -313,9 +312,6 @@ function openArtisteModal(id){
   document.getElementById('a-bar3-label').value = bars[2] ? bars[2].label||'' : '';
   document.getElementById('a-bar3-value').value = bars[2] ? bars[2].value||'' : '';
   document.getElementById('a-delete').style.display = a ? 'inline-block' : 'none';
-  const discoBtn = document.getElementById('a-discography-btn');
-  discoBtn.style.display = a ? 'inline-block' : 'none';
-  discoBtn.onclick = () => { if(a) openDiscographyModal(a.id); };
   modal.classList.add('active');
 }
 function closeArtisteModal(){ document.getElementById('modal-artiste').classList.remove('active'); }
@@ -352,10 +348,6 @@ document.getElementById('a-save').addEventListener('click', async ()=>{
     deezer: document.getElementById('a-deezer').value.trim(),
     paysEcoute: parseInt(document.getElementById('a-pays').value)||0,
     statut: document.getElementById('a-statut').value,
-    streams: parseInt(document.getElementById('a-streams').value)||0,
-    abonnes: parseInt(document.getElementById('a-abonnes').value)||0,
-    ecoutes: parseInt(document.getElementById('a-ecoutes').value)||0,
-    vuesYoutube: parseInt(document.getElementById('a-vues-youtube').value)||0,
     style_bars
   };
 
@@ -372,6 +364,8 @@ document.getElementById('a-save').addEventListener('click', async ()=>{
     else   await sb.from('artistes').insert(payload);
     await loadAll();
     renderArtistes();
+    renderStatsTab();
+    renderDiscographieTab();
     closeArtisteModal();
     toast('✅ Artiste enregistré');
   }catch(e){
@@ -385,6 +379,7 @@ document.getElementById('a-delete').addEventListener('click', async ()=>{
   await sb.from('artistes').delete().eq('id', id);
   await loadAll();
   renderArtistes();
+  renderStatsTab();
   closeArtisteModal();
   toast('🗑 Artiste supprimé');
 });
@@ -393,51 +388,160 @@ function escapeHtml(str){
   return String(str||'').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 }
 
-/* ═══════════════════════ DISCOGRAPHIE ═══════════════════════ */
-function openDiscographyModal(artisteId){
-  currentArtisteForDisco = artisteId;
-  const artiste = state.artistes.find(a => a.id === artisteId);
-  document.getElementById('modal-discography-title').textContent =
-    'Discographie — ' + (artiste ? artiste.nom : '');
-  renderDiscographyList();
-  document.getElementById('modal-discography').classList.add('active');
+/* ═══════════════════════ UPLOAD DE PHOTOS ═══════════════════════ */
+async function uploadFile(file){
+  const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
+  const path = `uploads/${Date.now()}-${Math.random().toString(36).slice(2,8)}.${ext}`;
+  const { error } = await sb.storage.from('medias').upload(path, file, { upsert: false });
+  if(error) throw error;
+  const { data } = sb.storage.from('medias').getPublicUrl(path);
+  return data.publicUrl;
 }
-function closeDiscographyModal(){
-  document.getElementById('modal-discography').classList.remove('active');
-  currentArtisteForDisco = null;
-}
-document.getElementById('disco-back').addEventListener('click', closeDiscographyModal);
 
-function renderDiscographyList(){
-  const list = document.getElementById('discography-list');
-  const tracks = state.discographie
-    .filter(t => t.artiste_id === currentArtisteForDisco)
-    .sort((a,b)=>(a.ordre||0)-(b.ordre||0));
-
-  let html = '<button id="disco-add-btn" class="btn btn-primary" style="width:100%;margin-bottom:12px;">+ Ajouter un titre</button>';
-  if(tracks.length === 0){
-    html += '<div class="empty-state">Aucun titre pour le moment.</div>';
-  } else {
-    html += tracks.map(t => `
-      <div class="card" onclick="openTrackModal('${t.id}')">
-        <div class="avatar" style="${t.cover_url?`background-image:url('${t.cover_url}')`:''}">${t.cover_url?'':'🎵'}</div>
-        <div class="card-main">
-          <div class="card-title">${escapeHtml(t.titre||'')}</div>
-          <div class="card-sub">${({single:'Single',ep:'EP',album:'Album'}[t.type]||t.type||'')}${t.date_sortie ? ' — ' + t.date_sortie : ''}</div>
-        </div>
-      </div>
-    `).join('');
+document.getElementById('a-photo-upload-btn').addEventListener('click', () => {
+  document.getElementById('a-photo-file').click();
+});
+document.getElementById('a-photo-file').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if(!file) return;
+  toast('⬆️ Envoi de la photo...');
+  try{
+    const url = await uploadFile(file);
+    document.getElementById('a-photo').value = url;
+    toast('✅ Photo envoyée');
+  }catch(err){
+    toast('⚠️ Erreur upload : ' + err.message);
   }
-  list.innerHTML = html;
-  document.getElementById('disco-add-btn').addEventListener('click', () => openTrackModal(null));
+  e.target.value = '';
+});
+
+document.getElementById('t-cover-upload-btn').addEventListener('click', () => {
+  document.getElementById('t-cover-file').click();
+});
+document.getElementById('t-cover-file').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if(!file) return;
+  toast('⬆️ Envoi de la pochette...');
+  try{
+    const url = await uploadFile(file);
+    document.getElementById('t-cover').value = url;
+    toast('✅ Pochette envoyée');
+  }catch(err){
+    toast('⚠️ Erreur upload : ' + err.message);
+  }
+  e.target.value = '';
+});
+
+/* ═══════════════════════ STATISTIQUES ═══════════════════════ */
+function renderStatsTab(){
+  const list = document.getElementById('stats-list');
+  const items = [...state.artistes].sort((a,b)=>(a.ordre||0)-(b.ordre||0));
+  if(items.length === 0){
+    list.innerHTML = '<div class="empty-state">Aucun artiste pour le moment.</div>';
+    return;
+  }
+  list.innerHTML = items.map(a => `
+    <div class="card" onclick="openStatsModal('${a.id}')">
+      <div class="avatar" style="${a.photoUrl?`background-image:url('${a.photoUrl}')`:''}">${a.photoUrl?'':(a.nom||'?')[0]}</div>
+      <div class="card-main">
+        <div class="card-title">${escapeHtml(a.nom)}</div>
+        <div class="card-sub">${(a.streams||0).toLocaleString('fr-FR')} streams · ${(a.abonnes||0).toLocaleString('fr-FR')} abonnés · ${(a.ecoutes||0).toLocaleString('fr-FR')} écoutes/mois · ${(a.vuesYoutube||0).toLocaleString('fr-FR')} vues YouTube</div>
+      </div>
+    </div>
+  `).join('');
 }
 
+function openStatsModal(id){
+  const a = state.artistes.find(x=>x.id===id);
+  if(!a) return;
+  document.getElementById('modal-stats-title').textContent = 'Statistiques — ' + a.nom;
+  document.getElementById('s-id').value = a.id;
+  document.getElementById('s-streams').value = a.streams||'';
+  document.getElementById('s-abonnes').value = a.abonnes||'';
+  document.getElementById('s-ecoutes').value = a.ecoutes||'';
+  document.getElementById('s-vues-youtube').value = a.vuesYoutube||'';
+  document.getElementById('modal-stats').classList.add('active');
+}
+function closeStatsModal(){ document.getElementById('modal-stats').classList.remove('active'); }
+document.getElementById('s-cancel').addEventListener('click', closeStatsModal);
+
+document.getElementById('s-save').addEventListener('click', async ()=>{
+  const id = document.getElementById('s-id').value;
+  const a = state.artistes.find(x=>x.id===id);
+  if(!a) return;
+
+  const liens = {
+    ...a._liens,
+    streams: parseInt(document.getElementById('s-streams').value)||0,
+    abonnes: parseInt(document.getElementById('s-abonnes').value)||0,
+    ecoutes: parseInt(document.getElementById('s-ecoutes').value)||0,
+    vuesYoutube: parseInt(document.getElementById('s-vues-youtube').value)||0
+  };
+
+  try{
+    await sb.from('artistes').update({ liens }).eq('id', id);
+    await loadAll();
+    renderStatsTab();
+    closeStatsModal();
+    toast('✅ Statistiques enregistrées');
+  }catch(e){
+    toast('⚠️ Erreur : ' + e.message);
+  }
+});
+
+/* ═══════════════════════ DISCOGRAPHIE ═══════════════════════ */
+function populateDiscoFilter(){
+  const select = document.getElementById('disco-filter-artiste');
+  const current = select.value;
+  const sorted = [...state.artistes].sort((a,b)=>(a.ordre||0)-(b.ordre||0));
+  select.innerHTML = '<option value="">Tous les artistes</option>' +
+    sorted.map(a => `<option value="${a.id}">${escapeHtml(a.nom)}</option>`).join('');
+  select.value = sorted.some(a=>a.id===current) ? current : '';
+}
+document.getElementById('disco-filter-artiste').addEventListener('change', renderDiscographieTab);
+
+function renderDiscographieTab(){
+  populateDiscoFilter();
+  const filterId = document.getElementById('disco-filter-artiste').value;
+  const list = document.getElementById('discographie-tab-list');
+  const artisteById = {};
+  state.artistes.forEach(a => { artisteById[a.id] = a; });
+
+  let tracks = [...state.discographie];
+  if(filterId) tracks = tracks.filter(t => t.artiste_id === filterId);
+  tracks.sort((a,b) => new Date(b.date_sortie||0) - new Date(a.date_sortie||0));
+
+  if(tracks.length === 0){
+    list.innerHTML = '<div class="empty-state">Aucun titre pour le moment.<br>Clique sur "+ Ajouter un titre" pour commencer.</div>';
+    return;
+  }
+  list.innerHTML = tracks.map(t => `
+    <div class="card" onclick="openTrackModal('${t.id}')">
+      <div class="avatar" style="${t.cover_url?`background-image:url('${t.cover_url}')`:''}">${t.cover_url?'':'🎵'}</div>
+      <div class="card-main">
+        <div class="card-title">${escapeHtml(t.titre||'')}</div>
+        <div class="card-sub">${escapeHtml((artisteById[t.artiste_id]||{}).nom||'')} — ${({single:'Single',ep:'EP',album:'Album'}[t.type]||t.type||'')}${t.date_sortie ? ' · ' + t.date_sortie : ''}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+document.getElementById('btn-add-track').addEventListener('click', () => openTrackModal(null));
 document.getElementById('t-cancel').addEventListener('click', closeTrackModal);
+
+function populateTrackArtisteSelect(preselectId){
+  const select = document.getElementById('t-artiste');
+  const sorted = [...state.artistes].sort((a,b)=>(a.ordre||0)-(b.ordre||0));
+  select.innerHTML = sorted.map(a => `<option value="${a.id}">${escapeHtml(a.nom)}</option>`).join('');
+  if(preselectId) select.value = preselectId;
+}
 
 function openTrackModal(id){
   const t = id ? state.discographie.find(x=>x.id===id) : null;
+  const filterId = document.getElementById('disco-filter-artiste').value;
   document.getElementById('modal-track-title').textContent = t ? 'Modifier le titre' : 'Nouveau titre';
   document.getElementById('t-id').value = t ? t.id : '';
+  populateTrackArtisteSelect(t ? t.artiste_id : filterId);
   document.getElementById('t-titre').value = t ? t.titre||'' : '';
   document.getElementById('t-type').value = t ? t.type||'single' : 'single';
   document.getElementById('t-date').value = t ? t.date_sortie||'' : '';
@@ -453,12 +557,14 @@ function closeTrackModal(){ document.getElementById('modal-track').classList.rem
 
 document.getElementById('t-save').addEventListener('click', async ()=>{
   const id = document.getElementById('t-id').value;
+  const artisteId = document.getElementById('t-artiste').value;
   const titre = document.getElementById('t-titre').value.trim();
+  if(!artisteId){ toast('⚠️ Choisis un artiste'); return; }
   if(!titre){ toast('⚠️ Le titre est obligatoire'); return; }
 
-  const existingCount = state.discographie.filter(t => t.artiste_id === currentArtisteForDisco).length;
+  const existingCount = state.discographie.filter(t => t.artiste_id === artisteId).length;
   const payload = {
-    artiste_id: currentArtisteForDisco,
+    artiste_id: artisteId,
     titre,
     type: document.getElementById('t-type').value,
     date_sortie: document.getElementById('t-date').value || null,
@@ -475,7 +581,7 @@ document.getElementById('t-save').addEventListener('click', async ()=>{
     else   await sb.from('discographie').insert(payload);
     const { data } = await sb.from('discographie').select('*').order('ordre');
     state.discographie = data || [];
-    renderDiscographyList();
+    renderDiscographieTab();
     closeTrackModal();
     toast('✅ Titre enregistré');
   }catch(e){
@@ -489,7 +595,7 @@ document.getElementById('t-delete').addEventListener('click', async ()=>{
   await sb.from('discographie').delete().eq('id', id);
   const { data } = await sb.from('discographie').select('*').order('ordre');
   state.discographie = data || [];
-  renderDiscographyList();
+  renderDiscographieTab();
   closeTrackModal();
   toast('🗑 Titre supprimé');
 });
