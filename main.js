@@ -2,6 +2,12 @@ const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
+// Correctif écran noir sur PC anciens / Windows 7 (pilotes GPU incompatibles)
+app.disableHardwareAcceleration();
+app.commandLine.appendSwitch('disable-gpu');
+app.commandLine.appendSwitch('disable-gpu-compositing');
+app.commandLine.appendSwitch('disable-software-rasterizer');
+
 // ─── Emplacement des données (persistant, propre à ton PC) ───
 const userDataPath = app.getPath('userData');
 const dataFile = path.join(userDataPath, 'dupont-data.json');
@@ -64,6 +70,7 @@ function createWindow() {
     minWidth: 900,
     minHeight: 600,
     backgroundColor: '#050505',
+    show: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -72,6 +79,7 @@ function createWindow() {
   });
   mainWindow.setMenuBarVisibility(false);
   mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
+  mainWindow.once('ready-to-show', () => mainWindow.show());
 }
 
 app.whenReady().then(createWindow);
