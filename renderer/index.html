@@ -26,42 +26,73 @@
 
 <!-- ══════ APPLICATION ══════ -->
 <div id="app-root" style="display:none;">
+<div class="shell">
 
-<div class="topbar">
-  <div class="brand">DUPONT <span>ADMIN</span></div>
-  <div class="tabs">
-    <button class="tab-btn active" data-tab="demandes">Demandes</button>
-    <button class="tab-btn" data-tab="artistes">Artistes</button>
-  </div>
-  <button id="btn-logout" class="btn btn-ghost" style="-webkit-app-region:no-drag;">Déconnexion</button>
-</div>
+  <aside class="sidebar">
+    <div class="brand-block">
+      <div class="brand-mark">DP</div>
+      <div class="brand-text">Dupont<span>Admin</span></div>
+    </div>
+    <nav class="nav">
+      <button class="tab-btn active" data-tab="demandes"><span class="nav-ic">✉</span>Messages</button>
+      <button class="tab-btn" data-tab="artistes"><span class="nav-ic">◈</span>Artistes</button>
+      <button class="tab-btn" data-tab="discographie"><span class="nav-ic">◐</span>Discographie</button>
+      <button class="tab-btn" data-tab="stats"><span class="nav-ic">▲</span>Statistiques</button>
+    </nav>
+    <button id="btn-logout" class="logout-btn">Déconnexion</button>
+  </aside>
 
-<!-- ══════ ONGLET DEMANDES ══════ -->
-<section id="tab-demandes" class="tab-panel active">
-  <div class="panel-head">
-    <h2>Demandes reçues</h2>
-    <button id="btn-add-demande" class="btn btn-primary">+ Ajouter une demande</button>
-  </div>
-  <div class="filters">
-    <button class="filter-btn active" data-filter="tous">Toutes</button>
-    <button class="filter-btn" data-filter="nouveau">Nouveau</button>
-    <button class="filter-btn" data-filter="en_cours">En cours</button>
-    <button class="filter-btn" data-filter="traite">Traité</button>
-    <button class="filter-btn" data-filter="refuse">Refusé</button>
-  </div>
-  <div id="demandes-list" class="list"></div>
-</section>
+  <main class="content">
 
-<!-- ══════ ONGLET ARTISTES ══════ -->
-<section id="tab-artistes" class="tab-panel">
-  <div class="panel-head">
-    <h2>Artistes du label</h2>
+  <!-- ══════ ONGLET DEMANDES ══════ -->
+  <section id="tab-demandes" class="tab-panel active">
+    <div class="panel-head">
+      <h2>Messages</h2>
+      <button id="btn-add-demande" class="btn btn-primary">+ Ajouter une demande</button>
+    </div>
+    <div class="filters">
+      <button class="filter-btn active" data-filter="tous">Toutes</button>
+      <button class="filter-btn" data-filter="nouveau">Nouveau</button>
+      <button class="filter-btn" data-filter="en_cours">En cours</button>
+      <button class="filter-btn" data-filter="traite">Traité</button>
+      <button class="filter-btn" data-filter="refuse">Refusé</button>
+    </div>
+    <div id="demandes-list" class="list"></div>
+  </section>
+
+  <!-- ══════ ONGLET ARTISTES ══════ -->
+  <section id="tab-artistes" class="tab-panel">
+    <div class="panel-head">
+      <h2>Artistes du label</h2>
     <div class="head-actions">
       <button id="btn-refresh" class="btn btn-ghost">🔄 Actualiser</button>
       <button id="btn-add-artiste" class="btn btn-primary">+ Ajouter un artiste</button>
     </div>
   </div>
   <div id="artistes-list" class="list"></div>
+</section>
+
+<!-- ══════ ONGLET DISCOGRAPHIE ══════ -->
+<section id="tab-discographie" class="tab-panel">
+  <div class="panel-head">
+    <h2>Discographie</h2>
+    <button id="btn-add-track" class="btn btn-primary">+ Ajouter un titre</button>
+  </div>
+  <div style="margin-bottom:16px;">
+    <label style="font-size:.72rem;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;">Filtrer par artiste</label>
+    <select id="disco-filter-artiste" style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:9px 12px;font-family:inherit;font-size:.88rem;margin-top:4px;width:260px;">
+      <option value="">Tous les artistes</option>
+    </select>
+  </div>
+  <div id="discographie-tab-list" class="list"></div>
+</section>
+
+<!-- ══════ ONGLET STATISTIQUES ══════ -->
+<section id="tab-stats" class="tab-panel">
+  <div class="panel-head">
+    <h2>Statistiques par artiste</h2>
+  </div>
+  <div id="stats-list" class="list"></div>
 </section>
 
 <!-- ══════ MODALE DEMANDE ══════ -->
@@ -134,8 +165,12 @@
     <input type="text" id="a-style" placeholder="Ex: Artiste Mélodique · Urbain">
     <label>Bio</label>
     <textarea id="a-bio" rows="3" placeholder="Description de l'artiste"></textarea>
-    <label>URL Photo</label>
-    <input type="text" id="a-photo" placeholder="https://...">
+    <label>Photo</label>
+    <div class="row" style="grid-template-columns:1fr auto;align-items:end;">
+      <input type="text" id="a-photo" placeholder="https://... (ou choisis un fichier)">
+      <button type="button" id="a-photo-upload-btn" class="btn btn-ghost">📁 Choisir</button>
+    </div>
+    <input type="file" id="a-photo-file" accept="image/*" style="display:none;">
     <div class="row">
       <div>
         <label>Spotify</label>
@@ -172,21 +207,6 @@
       <option value="a_venir">À venir</option>
       <option value="archive">Archivé</option>
     </select>
-    <label style="margin-top:10px;display:block;font-weight:700;">Statistiques (affichées sur le site)</label>
-    <div class="row">
-      <div>
-        <label>Streams (Spotify...)</label>
-        <input type="number" id="a-streams" placeholder="120000">
-      </div>
-      <div>
-        <label>Abonnés</label>
-        <input type="number" id="a-abonnes" placeholder="5400">
-      </div>
-    </div>
-    <label>Écoutes / mois</label>
-    <input type="number" id="a-ecoutes" placeholder="32000">
-    <label>Vues YouTube (total)</label>
-    <input type="number" id="a-vues-youtube" placeholder="180000">
     <label style="margin-top:10px;display:block;font-weight:700;">Barres de style (affichées sur le site)</label>
     <div class="row">
       <div>
@@ -219,7 +239,6 @@
       </div>
     </div>
     <div class="modal-actions">
-      <button id="a-discography-btn" class="btn btn-ghost" style="display:none;">🎵 Discographie</button>
       <button id="a-delete" class="btn btn-danger" style="display:none;">Supprimer</button>
       <div class="spacer"></div>
       <button id="a-cancel" class="btn btn-ghost">Annuler</button>
@@ -228,14 +247,35 @@
   </div>
 </div>
 
-<!-- ══════ MODALE DISCOGRAPHIE ══════ -->
-<div id="modal-discography" class="modal-overlay">
+<!-- ══════ MODALE STATISTIQUES ══════ -->
+<div id="modal-stats" class="modal-overlay">
   <div class="modal">
-    <h3 id="modal-discography-title">Discographie</h3>
-    <div id="discography-list" style="max-height:280px;overflow-y:auto;margin-bottom:14px;"></div>
+    <h3 id="modal-stats-title">Statistiques</h3>
+    <input type="hidden" id="s-id">
+    <div class="row">
+      <div>
+        <label>Streams (Spotify...)</label>
+        <input type="number" id="s-streams" placeholder="120000">
+      </div>
+      <div>
+        <label>Abonnés</label>
+        <input type="number" id="s-abonnes" placeholder="5400">
+      </div>
+    </div>
+    <div class="row">
+      <div>
+        <label>Écoutes / mois</label>
+        <input type="number" id="s-ecoutes" placeholder="32000">
+      </div>
+      <div>
+        <label>Vues YouTube (total)</label>
+        <input type="number" id="s-vues-youtube" placeholder="180000">
+      </div>
+    </div>
     <div class="modal-actions">
       <div class="spacer"></div>
-      <button id="disco-back" class="btn btn-ghost">← Retour à l'artiste</button>
+      <button id="s-cancel" class="btn btn-ghost">Annuler</button>
+      <button id="s-save" class="btn btn-primary">Enregistrer</button>
     </div>
   </div>
 </div>
@@ -245,6 +285,8 @@
   <div class="modal">
     <h3 id="modal-track-title">Nouveau titre</h3>
     <input type="hidden" id="t-id">
+    <label>Artiste</label>
+    <select id="t-artiste"></select>
     <label>Titre</label>
     <input type="text" id="t-titre" placeholder="Nom du morceau">
     <div class="row">
@@ -261,8 +303,12 @@
         <input type="date" id="t-date">
       </div>
     </div>
-    <label>URL Pochette</label>
-    <input type="text" id="t-cover" placeholder="https://...">
+    <label>Pochette</label>
+    <div class="row" style="grid-template-columns:1fr auto;align-items:end;">
+      <input type="text" id="t-cover" placeholder="https://... (ou choisis un fichier)">
+      <button type="button" id="t-cover-upload-btn" class="btn btn-ghost">📁 Choisir</button>
+    </div>
+    <input type="file" id="t-cover-file" accept="image/*" style="display:none;">
     <div class="row">
       <div>
         <label>Spotify</label>
@@ -292,6 +338,8 @@
   </div>
 </div>
 
+  </main>
+</div>
 </div><!-- /app-root -->
 
 <div id="toast" class="toast"></div>
