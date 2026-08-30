@@ -1,0 +1,33 @@
+{
+  "name": "dupont-admin",
+  "version": "1.0.0",
+  "description": "Application de gestion Dupont Productions - Artistes & Demandes",
+  "main": "main.js",
+  "author": "Dupont Productions",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win"
+  },
+  "devDependencies": {
+    "electron": "22.3.27",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.dupontproductions.admin",
+    "productName": "Dupont Admin",
+    "win": {
+      "target": "nsis",
+      "icon": "renderer/icon.png"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "createDesktopShortcut": true
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "renderer/**/*"
+    ]
+  }
+}
