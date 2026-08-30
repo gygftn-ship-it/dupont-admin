@@ -6,7 +6,7 @@
   "author": "Dupont Productions",
   "scripts": {
     "start": "electron .",
-    "dist": "electron-builder --win"
+    "dist": "electron-builder --win --publish=never"
   },
   "devDependencies": {
     "electron": "22.3.27",
