@@ -34,18 +34,32 @@
       <div class="brand-text">Dupont<span>Admin</span></div>
     </div>
     <nav class="nav">
-      <button class="tab-btn active" data-tab="demandes"><span class="nav-ic">✉</span>Messages</button>
+      <button class="tab-btn active" data-tab="dashboard"><span class="nav-ic">◆</span>Tableau de bord</button>
+      <button class="tab-btn" data-tab="demandes"><span class="nav-ic">✉</span>Messages<span id="nav-badge-demandes" class="nav-badge" style="display:none;"></span></button>
       <button class="tab-btn" data-tab="artistes"><span class="nav-ic">◈</span>Artistes</button>
       <button class="tab-btn" data-tab="discographie"><span class="nav-ic">◐</span>Discographie</button>
       <button class="tab-btn" data-tab="stats"><span class="nav-ic">▲</span>Statistiques</button>
+      <button class="tab-btn" data-tab="corbeille"><span class="nav-ic">🗑</span>Corbeille</button>
     </nav>
     <button id="btn-logout" class="logout-btn">Déconnexion</button>
   </aside>
 
   <main class="content">
 
+  <!-- ══════ ONGLET TABLEAU DE BORD ══════ -->
+  <section id="tab-dashboard" class="tab-panel active">
+    <div class="panel-head">
+      <h2>Tableau de bord</h2>
+    </div>
+    <div id="dashboard-cards" class="dash-grid"></div>
+    <div class="panel-head" style="margin-top:34px;">
+      <h2 style="font-size:1.4rem;">Activité récente</h2>
+    </div>
+    <div id="dashboard-recent" class="list"></div>
+  </section>
+
   <!-- ══════ ONGLET DEMANDES ══════ -->
-  <section id="tab-demandes" class="tab-panel active">
+  <section id="tab-demandes" class="tab-panel">
     <div class="panel-head">
       <h2>Messages</h2>
       <button id="btn-add-demande" class="btn btn-primary">+ Ajouter une demande</button>
@@ -93,6 +107,20 @@
     <h2>Statistiques par artiste</h2>
   </div>
   <div id="stats-list" class="list"></div>
+</section>
+
+<!-- ══════ ONGLET CORBEILLE ══════ -->
+<section id="tab-corbeille" class="tab-panel">
+  <div class="panel-head">
+    <h2>Corbeille</h2>
+  </div>
+  <div class="filters">
+    <button class="corbeille-filter-btn active" data-type="tous">Tout</button>
+    <button class="corbeille-filter-btn" data-type="artiste">Artistes</button>
+    <button class="corbeille-filter-btn" data-type="titre">Titres</button>
+    <button class="corbeille-filter-btn" data-type="demande">Demandes</button>
+  </div>
+  <div id="corbeille-list" class="list"></div>
 </section>
 
 <!-- ══════ MODALE DEMANDE ══════ -->
