@@ -66,6 +66,9 @@ async function init(){
   renderArtistes();
   renderStatsTab();
   renderDiscographieTab();
+  renderDashboard();
+  await loadCorbeille();
+  renderCorbeille();
 }
 
 document.getElementById('btn-refresh').addEventListener('click', async ()=>{
@@ -74,16 +77,19 @@ document.getElementById('btn-refresh').addEventListener('click', async ()=>{
   renderArtistes();
   renderStatsTab();
   renderDiscographieTab();
+  renderDashboard();
+  await loadCorbeille();
+  renderCorbeille();
   toast('🔄 Données actualisées');
 });
 
 async function loadAll(){
   const [{ data: artistes, error: e1 }, { data: contacts, error: e2 }, { data: reservations, error: e3 }, { data: discographie, error: e4 }] =
     await Promise.all([
-      sb.from('artistes').select('*').order('ordre'),
-      sb.from('messages_contact').select('*').order('created_at', { ascending: false }),
-      sb.from('demandes_reservation').select('*').order('created_at', { ascending: false }),
-      sb.from('discographie').select('*').order('ordre')
+      sb.from('artistes').select('*').eq('supprime', false).order('ordre'),
+      sb.from('messages_contact').select('*').eq('supprime', false).order('created_at', { ascending: false }),
+      sb.from('demandes_reservation').select('*').eq('supprime', false).order('created_at', { ascending: false }),
+      sb.from('discographie').select('*').eq('supprime', false).order('ordre')
     ]);
 
   if(e1) console.warn('Erreur chargement artistes:', e1.message);
@@ -147,6 +153,87 @@ document.querySelectorAll('.tab-btn').forEach(btn=>{
     document.getElementById('tab-'+btn.dataset.tab).classList.add('active');
   });
 });
+
+/* ═══════════════════════ TABLEAU DE BORD ═══════════════════════ */
+function updateNavBadge(){
+  const count = state.demandes.filter(d => d.statut === 'nouveau').length;
+  const badge = document.getElementById('nav-badge-demandes');
+  if(count > 0){ badge.textContent = count; badge.style.display = 'inline-block'; }
+  else { badge.style.display = 'none'; }
+}
+
+function renderDashboard(){
+  updateNavBadge();
+  const nouveaux = state.demandes.filter(d => d.statut === 'nouveau').length;
+  const reservationsEnAttente = state.demandes.filter(d => d.type === 'reservation' && d.statut === 'nouveau').length;
+  const artistesActifs = state.artistes.filter(a => a.statut !== 'archive').length;
+  const totalTitres = state.discographie.length;
+
+  document.getElementById('dashboard-cards').innerHTML = `
+    <div class="dash-card"><div class="dash-card-value">${nouveaux}</div><div class="dash-card-label">Messages non lus</div></div>
+    <div class="dash-card"><div class="dash-card-value">${reservationsEnAttente}</div><div class="dash-card-label">Réservations en attente</div></div>
+    <div class="dash-card"><div class="dash-card-value">${artistesActifs}</div><div class="dash-card-label">Artistes actifs</div></div>
+    <div class="dash-card"><div class="dash-card-value">${totalTitres}</div><div class="dash-card-label">Titres au catalogue</div></div>
+  `;
+
+  const recent = [...state.demandes]
+    .sort((a,b) => new Date(b.date||0) - new Date(a.date||0))
+    .slice(0, 6);
+  const recentList = document.getElementById('dashboard-recent');
+  if(recent.length === 0){
+    recentList.innerHTML = '<div class="empty-state">Aucune activité pour le moment.</div>';
+    return;
+  }
+  recentList.innerHTML = recent.map(d => `
+    <div class="card" onclick="switchToTab('demandes');setTimeout(()=>openDemandeModal('${d.id}'),50)">
+      <div class="avatar">${(d.type==='reservation'?'🎙️':'✉️')}</div>
+      <div class="card-main">
+        <div class="card-title">${escapeHtml(d.nom||'(sans nom)')} <span class="badge badge-${d.statut}">${statutLabel(d.statut)}</span></div>
+        <div class="card-sub">${escapeHtml(d.email||'')} — ${escapeHtml((d.message||'').slice(0,70))}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function switchToTab(tabName){
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+  document.querySelector(`.tab-btn[data-tab="${tabName}"]`).classList.add('active');
+  document.getElementById('tab-'+tabName).classList.add('active');
+}
+
+/* ═══════════════════════ RÉORGANISATION (glisser-déposer) ═══════════════════════ */
+let wasDragging = false;
+
+function makeListDraggable(container, onReorder){
+  let draggedEl = null;
+
+  container.querySelectorAll('.card').forEach(card => {
+    card.draggable = true;
+
+    card.addEventListener('dragstart', () => {
+      draggedEl = card;
+      setTimeout(() => card.classList.add('dragging'), 0);
+    });
+    card.addEventListener('dragend', () => {
+      card.classList.remove('dragging');
+      container.querySelectorAll('.card').forEach(c => c.classList.remove('drag-over'));
+      const newOrder = [...container.querySelectorAll('.card')].map(c => c.dataset.id);
+      wasDragging = true;
+      setTimeout(() => wasDragging = false, 200);
+      onReorder(newOrder);
+    });
+    card.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      if(card === draggedEl) return;
+      card.classList.add('drag-over');
+      const rect = card.getBoundingClientRect();
+      const after = (e.clientY - rect.top) > rect.height / 2;
+      container.insertBefore(draggedEl, after ? card.nextSibling : card);
+    });
+    card.addEventListener('dragleave', () => card.classList.remove('drag-over'));
+  });
+}
 
 /* ═══════════════════════ DEMANDES ═══════════════════════ */
 document.querySelectorAll('.filter-btn').forEach(btn=>{
@@ -247,6 +334,7 @@ document.getElementById('d-save').addEventListener('click', async ()=>{
     }
     await loadAll();
     renderDemandes();
+    renderDashboard();
     closeDemandeModal();
     toast('✅ Demande enregistrée');
   }catch(e){
@@ -257,13 +345,16 @@ document.getElementById('d-save').addEventListener('click', async ()=>{
 document.getElementById('d-delete').addEventListener('click', async ()=>{
   const id = document.getElementById('d-id').value;
   const d = state.demandes.find(x=>x.id===id);
-  if(!confirm('Supprimer cette demande ?')) return;
+  if(!confirm('Mettre cette demande à la corbeille ?')) return;
   const table = d.type === 'reservation' ? 'demandes_reservation' : 'messages_contact';
-  await sb.from(table).delete().eq('id', id);
+  await sb.from(table).update({ supprime: true }).eq('id', id);
   await loadAll();
   renderDemandes();
+  renderDashboard();
   closeDemandeModal();
-  toast('🗑 Demande supprimée');
+  toast('🗑 Demande envoyée à la corbeille');
+  await loadCorbeille();
+  renderCorbeille();
 });
 
 /* ═══════════════════════ ARTISTES ═══════════════════════ */
@@ -275,7 +366,8 @@ function renderArtistes(){
     return;
   }
   list.innerHTML = items.map(a => `
-    <div class="card" onclick="openArtisteModal('${a.id}')">
+    <div class="card" data-id="${a.id}" onclick="if(!wasDragging)openArtisteModal('${a.id}')">
+      <span class="drag-handle">⠿</span>
       <div class="avatar" style="${a.photoUrl?`background-image:url('${a.photoUrl}')`:''}">${a.photoUrl?'':(a.nom||'?')[0]}</div>
       <div class="card-main">
         <div class="card-title">${escapeHtml(a.nom)} <span class="badge badge-${a.statut}">${statutLabel(a.statut)}</span></div>
@@ -283,6 +375,11 @@ function renderArtistes(){
       </div>
     </div>
   `).join('');
+  makeListDraggable(list, async (newOrderIds) => {
+    await Promise.all(newOrderIds.map((id, i) => sb.from('artistes').update({ ordre: i }).eq('id', id)));
+    await loadAll();
+    renderArtistes();
+  });
 }
 
 document.getElementById('btn-add-artiste').addEventListener('click', ()=>openArtisteModal(null));
@@ -366,6 +463,7 @@ document.getElementById('a-save').addEventListener('click', async ()=>{
     renderArtistes();
     renderStatsTab();
     renderDiscographieTab();
+    renderDashboard();
     closeArtisteModal();
     toast('✅ Artiste enregistré');
   }catch(e){
@@ -375,13 +473,16 @@ document.getElementById('a-save').addEventListener('click', async ()=>{
 
 document.getElementById('a-delete').addEventListener('click', async ()=>{
   const id = document.getElementById('a-id').value;
-  if(!confirm('Supprimer cet artiste ?')) return;
-  await sb.from('artistes').delete().eq('id', id);
+  if(!confirm('Mettre cet artiste à la corbeille ?')) return;
+  await sb.from('artistes').update({ supprime: true }).eq('id', id);
   await loadAll();
   renderArtistes();
   renderStatsTab();
+  renderDashboard();
   closeArtisteModal();
-  toast('🗑 Artiste supprimé');
+  toast('🗑 Artiste envoyé à la corbeille');
+  await loadCorbeille();
+  renderCorbeille();
 });
 
 function escapeHtml(str){
@@ -392,9 +493,9 @@ function escapeHtml(str){
 async function uploadFile(file){
   const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
   const path = `uploads/${Date.now()}-${Math.random().toString(36).slice(2,8)}.${ext}`;
-  const { error } = await sb.storage.from('medias').upload(path, file, { upsert: false });
+  const { error } = await sb.storage.from('media').upload(path, file, { upsert: false });
   if(error) throw error;
-  const { data } = sb.storage.from('medias').getPublicUrl(path);
+  const { data } = sb.storage.from('media').getPublicUrl(path);
   return data.publicUrl;
 }
 
@@ -508,15 +609,19 @@ function renderDiscographieTab(){
   state.artistes.forEach(a => { artisteById[a.id] = a; });
 
   let tracks = [...state.discographie];
-  if(filterId) tracks = tracks.filter(t => t.artiste_id === filterId);
-  tracks.sort((a,b) => new Date(b.date_sortie||0) - new Date(a.date_sortie||0));
+  if(filterId){
+    tracks = tracks.filter(t => t.artiste_id === filterId).sort((a,b)=>(a.ordre||0)-(b.ordre||0));
+  } else {
+    tracks.sort((a,b) => new Date(b.date_sortie||0) - new Date(a.date_sortie||0));
+  }
 
   if(tracks.length === 0){
     list.innerHTML = '<div class="empty-state">Aucun titre pour le moment.<br>Clique sur "+ Ajouter un titre" pour commencer.</div>';
     return;
   }
   list.innerHTML = tracks.map(t => `
-    <div class="card" onclick="openTrackModal('${t.id}')">
+    <div class="card" data-id="${t.id}" onclick="if(!wasDragging)openTrackModal('${t.id}')">
+      ${filterId ? '<span class="drag-handle">⠿</span>' : ''}
       <div class="avatar" style="${t.cover_url?`background-image:url('${t.cover_url}')`:''}">${t.cover_url?'':'🎵'}</div>
       <div class="card-main">
         <div class="card-title">${escapeHtml(t.titre||'')}</div>
@@ -524,6 +629,15 @@ function renderDiscographieTab(){
       </div>
     </div>
   `).join('');
+
+  if(filterId){
+    makeListDraggable(list, async (newOrderIds) => {
+      await Promise.all(newOrderIds.map((id, i) => sb.from('discographie').update({ ordre: i }).eq('id', id)));
+      const { data } = await sb.from('discographie').select('*').eq('supprime', false).order('ordre');
+      state.discographie = data || [];
+      renderDiscographieTab();
+    });
+  }
 }
 
 document.getElementById('btn-add-track').addEventListener('click', () => openTrackModal(null));
@@ -579,9 +693,10 @@ document.getElementById('t-save').addEventListener('click', async ()=>{
   try{
     if(id) await sb.from('discographie').update(payload).eq('id', id);
     else   await sb.from('discographie').insert(payload);
-    const { data } = await sb.from('discographie').select('*').order('ordre');
+    const { data } = await sb.from('discographie').select('*').eq('supprime', false).order('ordre');
     state.discographie = data || [];
     renderDiscographieTab();
+    renderDashboard();
     closeTrackModal();
     toast('✅ Titre enregistré');
   }catch(e){
@@ -591,14 +706,88 @@ document.getElementById('t-save').addEventListener('click', async ()=>{
 
 document.getElementById('t-delete').addEventListener('click', async ()=>{
   const id = document.getElementById('t-id').value;
-  if(!confirm('Supprimer ce titre ?')) return;
-  await sb.from('discographie').delete().eq('id', id);
-  const { data } = await sb.from('discographie').select('*').order('ordre');
+  if(!confirm('Mettre ce titre à la corbeille ?')) return;
+  await sb.from('discographie').update({ supprime: true }).eq('id', id);
+  const { data } = await sb.from('discographie').select('*').eq('supprime', false).order('ordre');
   state.discographie = data || [];
   renderDiscographieTab();
+  renderDashboard();
   closeTrackModal();
-  toast('🗑 Titre supprimé');
+  toast('🗑 Titre envoyé à la corbeille');
+  await loadCorbeille();
+  renderCorbeille();
 });
+
+/* ═══════════════════════ CORBEILLE ═══════════════════════ */
+let corbeilleFilter = 'tous';
+let corbeilleItems = [];
+
+document.querySelectorAll('.corbeille-filter-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.corbeille-filter-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    corbeilleFilter = btn.dataset.type;
+    renderCorbeille();
+  });
+});
+
+async function loadCorbeille(){
+  const [{ data: artistes }, { data: contacts }, { data: reservations }, { data: titres }] = await Promise.all([
+    sb.from('artistes').select('*').eq('supprime', true),
+    sb.from('messages_contact').select('*').eq('supprime', true),
+    sb.from('demandes_reservation').select('*').eq('supprime', true),
+    sb.from('discographie').select('*').eq('supprime', true)
+  ]);
+
+  corbeilleItems = [
+    ...(artistes||[]).map(a => ({ kind:'artiste', table:'artistes', id:a.id, label:a.nom, sub:'Artiste', date:a.created_at })),
+    ...(contacts||[]).map(c => ({ kind:'demande', table:'messages_contact', id:c.id, label:c.nom||'(sans nom)', sub:'Message : ' + (c.message||'').slice(0,50), date:c.created_at })),
+    ...(reservations||[]).map(r => ({ kind:'demande', table:'demandes_reservation', id:r.id, label:r.nom||'(sans nom)', sub:'Réservation studio', date:r.created_at })),
+    ...(titres||[]).map(t => ({ kind:'titre', table:'discographie', id:t.id, label:t.titre, sub:'Titre discographie', date:t.created_at }))
+  ];
+}
+
+function renderCorbeille(){
+  const list = document.getElementById('corbeille-list');
+  let items = [...corbeilleItems];
+  if(corbeilleFilter !== 'tous') items = items.filter(i => i.kind === corbeilleFilter);
+  items.sort((a,b) => new Date(b.date||0) - new Date(a.date||0));
+
+  if(items.length === 0){
+    list.innerHTML = '<div class="empty-state">La corbeille est vide.</div>';
+    return;
+  }
+  list.innerHTML = items.map((item, i) => `
+    <div class="card" style="cursor:default;">
+      <div class="avatar">${({artiste:'◈',titre:'🎵',demande:'✉️'})[item.kind]}</div>
+      <div class="card-main">
+        <div class="card-title">${escapeHtml(item.label||'')}</div>
+        <div class="card-sub">${escapeHtml(item.sub||'')}</div>
+      </div>
+      <div style="display:flex;gap:8px;flex-shrink:0;">
+        <button class="btn btn-ghost" onclick="restoreFromCorbeille('${item.table}','${item.id}')">↺ Restaurer</button>
+        <button class="btn btn-danger" onclick="deleteForeverFromCorbeille('${item.table}','${item.id}')">Supprimer définitivement</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function restoreFromCorbeille(table, id){
+  await sb.from(table).update({ supprime: false }).eq('id', id);
+  await loadCorbeille();
+  renderCorbeille();
+  await loadAll();
+  renderDemandes(); renderArtistes(); renderStatsTab(); renderDiscographieTab(); renderDashboard();
+  toast('↺ Élément restauré');
+}
+
+async function deleteForeverFromCorbeille(table, id){
+  if(!confirm('Supprimer définitivement ? Cette action est irréversible.')) return;
+  await sb.from(table).delete().eq('id', id);
+  await loadCorbeille();
+  renderCorbeille();
+  toast('🗑 Supprimé définitivement');
+}
 
 /* ═══════════════════════════════════════
    DÉMARRAGE
